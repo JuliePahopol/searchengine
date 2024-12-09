@@ -3,6 +3,7 @@ import pickle
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import networkx as nx
+import json
 
 app = Flask(__name__, template_folder="./static/")
 
@@ -10,6 +11,11 @@ app = Flask(__name__, template_folder="./static/")
 @app.route("/")
 def websearch():
     return render_template("websearch.html")
+
+
+@app.route("/imagesearch")
+def imagesearch():
+    return render_template("imagesearch.html")
 
 
 @app.route("/a")
@@ -38,9 +44,9 @@ def e():
 
 
 @app.route("/websearch", methods=["GET", "POST"])
-#Граф = сайты и связи между ними.
-#PageRank = вычисление важности сайтов.
-#Фильтрация = показываем только сайты с хорошим рейтингом.
+# Граф = сайты и связи между ними.
+# PageRank = вычисление важности сайтов.
+# Фильтрация = показываем только сайты с хорошим рейтингом.
 
 
 def web_search():
@@ -58,7 +64,7 @@ def web_search():
 
         tokenized_text = load_tokenized_text("tokenized_text_pickle.pkl")
         tfidf = TfidfVectorizer()
-        #Преобразование текста в числовые векторы с помощью TF-IDF
+        # Преобразование текста в числовые векторы с помощью TF-IDF
         # Вектор представляет собой набор чисел, которые показывают важность слов в тексте.
         tfidf_vectors = tfidf.fit_transform(
             [" ".join(tokens) for tokens in tokenized_text]
@@ -84,20 +90,45 @@ def web_search():
                     G.add_edge(link, websites[j], weight=sim)
 
         pagerank = nx.pagerank(G)
-        #Результатом работы PageRank будет рейтинг каждого сайта.
+        # Результатом работы PageRank будет рейтинг каждого сайта.
         # Чем выше рейтинг, тем более важным считается сайт.
 
-
         ranked_results = sorted(pagerank.items(), key=lambda x: x[1], reverse=True)
-        #После вычисления важности, мы сортируем сайты по их рейтингу
+        # После вычисления важности, мы сортируем сайты по их рейтингу
         # от самого важного к менее важному.
 
         top_results = [x[0] for x in ranked_results if x[1] >= 0.14]
-        #Мы отбираем только те сайты, которые имеют рейтинг 0.14 и выше.
-        # Это помогает исключить сайты, которые не сильно связаны с запросом 
+        # Мы отбираем только те сайты, которые имеют рейтинг 0.14 и выше.
+        # Это помогает исключить сайты, которые не сильно связаны с запросом
         # или не так важны
 
         return render_template("results.html", data=[top_results, query])
+
+
+@app.route("/search_images", methods=["GET", "POST"])
+def search_images():
+    if request.method == "POST":
+        query = request.form["query"].lower()
+
+        if query == "":
+            return render_template("imagesearch.html")
+
+        with open("images.json", "r") as f:
+            images = json.load(f)
+
+        # search for img with alt text and the title that contain the query term
+        results = []
+        for img in images:
+            if query in img["alt_text"] or query in img["title"]:
+                results.append(img)
+
+            else:
+                continue
+
+        if len(results) == 0:
+            return render_template("notfound.html")
+
+        return render_template("imageresults.html", data=[results, query])
 
 
 def load_tokenized_text(filename):
